@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================
+   Styles globaux de base
+   ========================= */
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply font-sans bg-gray-50 text-gray-800;
+}
+
+/* =========================
+   Composants personnalisés
+   ========================= */
+
+.btn-primary {
+  @apply bg-emd-orange-500 hover:bg-emd-orange-600 text-white font-semibold
+         px-6 py-3 rounded-lg transition-all duration-300 shadow-md;
+}
+
+.btn-secondary {
+  @apply bg-emd-blue-900 hover:bg-emd-blue-800 text-white font-semibold
+         px-6 py-3 rounded-lg transition-all duration-300;
+}
+
+.card {
+  @apply bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300;
+}
+
+/* =========================
+   Animations simples
+   ========================= */
+
+.fade-in {
+  animation: fadeIn 0.6s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =========================
+   Accessibilité
+   ========================= */
+
+a {
+  @apply transition-colors duration-300;
+}
+
+a:focus,
+button:focus {
+  outline: 2px solid #f97316;
+  outline-offset: 2px;
+}
