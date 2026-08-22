@@ -1,21 +1,21 @@
 """
 Django settings for emd_backend project.
+Configured for local dev (SQLite) and Render production (PostgreSQL).
 """
 
 from pathlib import Path
 import os
+import dj_database_url
+from decouple import config, Csv
 
 # ===================== BASE =====================
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-change-this-in-production'
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-production')
 
-DEBUG = True
+DEBUG = config('DJANGO_DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-]
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 
 # ===================== APPS =====================
 INSTALLED_APPS = [
@@ -30,19 +30,16 @@ INSTALLED_APPS = [
     # Third-party
     'rest_framework',
     'corsheaders',
-
-    # Local
-    #Maps
-    
+    'cloudinary_storage',
+    'cloudinary',
 ]
 
 # ===================== MIDDLEWARE =====================
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Whitenoise pour les fichiers statiques
     'django.contrib.sessions.middleware.SessionMiddleware',
-
     'corsheaders.middleware.CorsMiddleware',
-
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -72,11 +69,12 @@ TEMPLATES = [
 ]
 
 # ===================== DATABASE =====================
+# En local : utilise .env avec DATABASE_URL=sqlite:///db.sqlite3
+# Sur Render : utilise l'URL PostgreSQL fournie automatiquement
+DATABASE_URL = config('DATABASE_URL', default=f'sqlite:///{BASE_DIR}/db.sqlite3')
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
 }
 
 # ===================== PASSWORD VALIDATION =====================
@@ -96,17 +94,29 @@ USE_TZ = True
 # ===================== STATIC / MEDIA =====================
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# ===================== CLOUDINARY =====================
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME', default=''),
+    'API_KEY': config('CLOUDINARY_API_KEY', default=''),
+    'API_SECRET': config('CLOUDINARY_API_SECRET', default=''),
+}
+
+# Utiliser Cloudinary pour stocker les fichiers médias (images)
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
 # ===================== CORS =====================
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5174",
-    "http://localhost:8000",
-]
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='http://localhost:5173,http://localhost:8000',
+    cast=Csv()
+)
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -119,18 +129,18 @@ REST_FRAMEWORK = {
 
 # ===================== EMAIL (GMAIL SMTP) =====================
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-
-EMAIL_HOST_USER = 'dabakhba08@gmail.com'
-EMAIL_HOST_PASSWORD = 'jxgwshcowrovnmxs'
-
-DEFAULT_FROM_EMAIL = 'Site EMD <dabakhba08@gmail.com>'
-
-# Email qui reçoit les messages du formulaire
-EMAIL_RECEIVER = 'dabakhba08@gmail.com'
-
-# IMPORTANT : forcer l’affichage des erreurs
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = f'Site EMD <{config("EMAIL_HOST_USER", default="")}>'
+EMAIL_RECEIVER = config('EMAIL_RECEIVER', default='')
 EMAIL_FAIL_SILENTLY = False
+
+# ===================== SÉCURITÉ PRODUCTION =====================
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
