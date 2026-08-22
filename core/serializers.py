@@ -14,8 +14,8 @@ class ContactMessageSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = ContactMessage
-        fields = ['id', 'nom', 'email', 'message', 'date', 'lu', 'traite']
-        read_only_fields = ['id', 'date', 'lu', 'traite']
+        fields = ['id', 'nom', 'email', 'message', 'date', 'lu', 'traite', 'notes']
+        read_only_fields = ['id', 'date']
     
     def validate_nom(self, value):
         """Validation du champ nom"""
@@ -54,6 +54,7 @@ class GalleryImageSerializer(serializers.ModelSerializer):
     Gère les images de la galerie avec leurs métadonnées.
     """
     
+    image = serializers.ImageField(required=False, allow_null=True)
     image_url = serializers.SerializerMethodField()
     cycle_display = serializers.CharField(source='get_cycle_display', read_only=True)
     
@@ -126,7 +127,6 @@ class NewsArticleDetailSerializer(serializers.ModelSerializer):
     Serializer pour le détail d'un article (version complète).
     Utilisé pour afficher un article complet.
     """
-    
     image_url = serializers.SerializerMethodField()
     category_display = serializers.CharField(source='get_category_display', read_only=True)
     
@@ -167,3 +167,65 @@ class NewsArticleDetailSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.image.url)
             return obj.image.url
         return None
+
+
+class AdminNewsArticleSerializer(serializers.ModelSerializer):
+    """
+    Serializer complet pour le dashboard admin :
+    inclut les articles non publiés et le champ is_published.
+    """
+
+    image_url = serializers.SerializerMethodField()
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+
+    class Meta:
+        model = NewsArticle
+        fields = [
+            'id',
+            'title',
+            'slug',
+            'excerpt',
+            'content',
+            'image',
+            'image_url',
+            'category',
+            'category_display',
+            'author',
+            'published_date',
+            'is_published',
+            'is_featured',
+            'views_count'
+        ]
+        read_only_fields = [
+            'id',
+            'slug',
+            'published_date',
+            'views_count',
+            'image_url',
+            'category_display'
+        ]
+
+    def get_image_url(self, obj):
+        """Retourne l'URL complète de l'image"""
+        request = self.context.get('request')
+        if obj.image and hasattr(obj.image, 'url'):
+            if request is not None:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
+
+    def validate_title(self, value):
+        value = value.strip()
+        if len(value) < 3:
+            raise serializers.ValidationError(
+                "Le titre doit contenir au moins 3 caractères."
+            )
+        return value
+
+    def validate_excerpt(self, value):
+        value = value.strip()
+        if len(value) > 300:
+            raise serializers.ValidationError(
+                "Le résumé ne peut pas dépasser 300 caractères."
+            )
+        return value

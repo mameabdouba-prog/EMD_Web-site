@@ -1,21 +1,23 @@
-<<<<<<< HEAD
 # =============================
 # Python / Django
 # =============================
 *.pyc
 __pycache__/
 db.sqlite3
+db.sqlite3-journal
 env/
 venv/
+.venv/
 .env
+.env.local
+.env.production
 *.log
-/staticfiles/
+staticfiles/
 media/
+emd_backend/emd_backend/
 
-# Django migrations (optionnel)
-*/migrations/*.pyc
+# Django migrations caches
 */migrations/__pycache__/
-*/migrations/*_cache
 
 # =============================
 # Node / React
@@ -23,9 +25,13 @@ media/
 node_modules/
 build/
 dist/
+dist-ssr/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.local
 
 # =============================
 # IDE / OS
@@ -33,38 +39,16 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 *.swp
-
-# =============================
-# Mac / Linux hidden files
-# =============================
-*.~*
-=======
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
+.idea
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?
+*.~*
 
-# Environment variables
-.env
-.env.local
-.env.production
+# =============================
+# Build artifacts
+# =============================
+build_output.txt

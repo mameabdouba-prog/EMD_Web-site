@@ -6,8 +6,8 @@ const ScrollToTop = () => {
   const location = useLocation();
 
   useEffect(() => {
-    // Remonter en haut de page
-    window.scrollTo(0, 0);
+    // Remonter en haut de page instantanément (pas d'animation au changement de page)
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 
     // Envoyer la page vue à Google Analytics
     ReactGA.send({
