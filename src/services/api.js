@@ -6,7 +6,7 @@ import axios from 'axios';
  */
 
 // URL de base de l'API Django
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://gs-emd.onrender.com/api';
 
 // Instance Axios configurée
 const api = axios.create({
@@ -18,35 +18,49 @@ const api = axios.create({
   timeout: 10000, // 10 secondes
 });
 
-// Intercepteur pour logger les requêtes (développement)
+const isDev = import.meta.env.DEV;
+
+// Joint le token admin (s'il existe) à chaque requête sortante
 api.interceptors.request.use(
   (config) => {
-    console.log(`📤 API Request: ${config.method.toUpperCase()} ${config.url}`);
+    try {
+      const raw = sessionStorage.getItem('emd_admin_auth_session');
+      if (raw) {
+        const session = JSON.parse(raw);
+        if (session?.token) {
+          config.headers.Authorization = `Bearer ${session.token}`;
+        }
+      }
+    } catch {
+      // session illisible : on envoie la requête sans token
+    }
     return config;
   },
-  (error) => {
-    console.error('❌ Request Error:', error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Intercepteur pour gérer les réponses et erreurs
+// Intercepteur de réponse : journalisation limitée au développement,
+// aucune donnée sensible affichée en production.
 api.interceptors.response.use(
   (response) => {
-    console.log(`📥 API Response: ${response.status} ${response.config.url}`);
+    if (isDev) {
+      console.log(`API ${response.status} ${response.config.url}`);
+    }
     return response;
   },
   (error) => {
-    if (error.response) {
-      console.error('❌ Response Error:', {
-        status: error.response.status,
-        data: error.response.data,
-        url: error.config.url
-      });
-    } else if (error.request) {
-      console.error('❌ No Response:', error.request);
-    } else {
-      console.error('❌ Request Setup Error:', error.message);
+    if (isDev) {
+      if (error.response) {
+        console.error(`API Error ${error.response.status} ${error.config?.url}`);
+      } else if (error.request) {
+        console.error('API Error: pas de réponse du serveur');
+      } else {
+        console.error('API Error:', error.message);
+      }
+    }
+    // Expiration de session admin -> nettoyage local
+    if (error.response?.status === 401) {
+      sessionStorage.removeItem('emd_admin_auth_session');
     }
     return Promise.reject(error);
   }
