@@ -10,6 +10,12 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.core.mail import EmailMessage
+from django.contrib.auth.hashers import check_password
+import hmac
+import hashlib
+import json
+import secrets
+from datetime import datetime, timedelta
 import logging
 
 from .models import ContactMessage, GalleryImage, NewsArticle
@@ -21,6 +27,45 @@ from .serializers import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ==================== ADMIN TOKEN UTILITIES ====================
+
+def generate_admin_token():
+    """Génère un token signé pour l'authentification admin"""
+    payload = {
+        'iat': datetime.now().isoformat(),
+        'data': secrets.token_hex(16)
+    }
+    payload_str = json.dumps(payload)
+    
+    # Signer avec la SECRET_KEY
+    signature = hmac.new(
+        settings.SECRET_KEY.encode(),
+        payload_str.encode(),
+        hashlib.sha256
+    ).hexdigest()
+    
+    return f"{signature}:{payload_str}"
+
+def verify_admin_token(token):
+    """Vérifie un token signé et retourne True/False"""
+    try:
+        signature, payload_str = token.split(':')
+        expected_signature = hmac.new(
+            settings.SECRET_KEY.encode(),
+            payload_str.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        return signature == expected_signature
+    except Exception:
+        return False
+
+def extract_admin_token(request):
+    """Extrait le token Bearer d'une requête"""
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if auth_header.startswith('Bearer '):
+        return auth_header[7:]
+    return None
 
 # ==================== CONTACT ====================
 
@@ -258,6 +303,182 @@ def health_check(request):
             "message": "API EMD opérationnelle",
             "version": "2.0.0",
             "features": ["contact", "gallery", "news"]
+        },
+        status=status.HTTP_200_OK
+    )
+# ==================== ADMIN ENDPOINTS ====================
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def admin_login(request):
+    """
+    Authentification admin
+    POST /api/admin/login/
+    {
+        "username": "admin",
+        "password": "mot_de_passe"
+    }
+    """
+    try:
+        username = request.data.get('username', '')
+        password = request.data.get('password', '')
+        
+        if not username or not password:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Identifiants manquants"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Vérification des identifiants
+        if username != settings.ADMIN_API_USERNAME:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Identifiants incorrects"
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Vérifier le mot de passe avec check_password de Django
+        if not check_password(password, settings.ADMIN_API_PASSWORD_HASH):
+            return Response(
+                {
+                    "success": False,
+                    "message": "Identifiants incorrects"
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Générer le token
+        token = generate_admin_token()
+        
+        return Response(
+            {
+                "success": True,
+                "token": token,
+                "expires_in": settings.ADMIN_TOKEN_MAX_AGE,
+                "session": {
+                    "user": {
+                        "name": "Administrateur EMD",
+                        "role": "Super Admin"
+                    }
+                }
+            },
+            status=status.HTTP_200_OK
+        )
+    
+    except Exception as e:
+        logger.error(f"Admin login error: {str(e)}")
+        return Response(
+            {
+                "success": False,
+                "message": "Erreur serveur lors de l'authentification"
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def admin_news(request):
+    """
+    Récupère toutes les actualités (admin version)
+    GET /api/admin/news/
+    Nécessite un token Bearer valide
+    """
+    # Vérifier le token
+    token = extract_admin_token(request)
+    if not token or not verify_admin_token(token):
+        return Response(
+            {
+                "success": False,
+                "message": "Non autorisé"
+            },
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    # Retourner toutes les actualités (pas de filtre is_published pour l'admin)
+    articles = NewsArticle.objects.all().order_by('-date_created')
+    
+    serializer = NewsArticleListSerializer(
+        articles,
+        many=True,
+        context={"request": request}
+    )
+    
+    return Response(
+        {
+            "success": True,
+            "count": articles.count(),
+            "data": serializer.data
+        },
+        status=status.HTTP_200_OK
+    )
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def admin_gallery(request):
+    """
+    Récupère toutes les images de galerie (admin version)
+    GET /api/admin/gallery/
+    Nécessite un token Bearer valide
+    """
+    # Vérifier le token
+    token = extract_admin_token(request)
+    if not token or not verify_admin_token(token):
+        return Response(
+            {
+                "success": False,
+                "message": "Non autorisé"
+            },
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    # Retourner toutes les images (pas de filtre is_active pour l'admin)
+    images = GalleryImage.objects.all().order_by('-date_created')
+    
+    serializer = GalleryImageSerializer(images, many=True)
+    
+    return Response(
+        {
+            "success": True,
+            "count": images.count(),
+            "data": serializer.data
+        },
+        status=status.HTTP_200_OK
+    )
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def admin_messages(request):
+    """
+    Récupère tous les messages de contact (admin version)
+    GET /api/admin/messages/
+    Nécessite un token Bearer valide
+    """
+    # Vérifier le token
+    token = extract_admin_token(request)
+    if not token or not verify_admin_token(token):
+        return Response(
+            {
+                "success": False,
+                "message": "Non autorisé"
+            },
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    # Retourner tous les messages
+    messages = ContactMessage.objects.all().order_by('-date')
+    
+    serializer = ContactMessageSerializer(messages, many=True)
+    
+    return Response(
+        {
+            "success": True,
+            "count": messages.count(),
+            "data": serializer.data
         },
         status=status.HTTP_200_OK
     )

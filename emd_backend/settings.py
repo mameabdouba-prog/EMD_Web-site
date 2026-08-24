@@ -138,6 +138,14 @@ DEFAULT_FROM_EMAIL = f'Site EMD <{config("EMAIL_HOST_USER", default="")}>'
 EMAIL_RECEIVER = config('EMAIL_RECEIVER', default='')
 EMAIL_FAIL_SILENTLY = False
 
+# ===================== ADMIN API AUTHENTICATION =====================
+# Identifiants pour le dashboard admin
+# Générer le hash du mot de passe :
+#   python manage.py shell -c "from django.contrib.auth.hashers import make_password; print(make_password('MOT_DE_PASSE'))"
+ADMIN_API_USERNAME = config('ADMIN_API_USERNAME', default='admin')
+ADMIN_API_PASSWORD_HASH = config('ADMIN_API_PASSWORD_HASH', default='pbkdf2_sha256$720000$DZ8KqGHmg1gJ$l3RhQBd52D8Z8X/Y8l3RhQBd52D8Z8X/Y8l3RhQBd52D8=')  # "admin" par défaut
+ADMIN_TOKEN_MAX_AGE = config('ADMIN_TOKEN_MAX_AGE', default=28800, cast=int)  # 8 heures
+
 # ===================== SÉCURITÉ PRODUCTION =====================
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
