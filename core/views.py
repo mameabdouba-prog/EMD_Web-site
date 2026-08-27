@@ -360,7 +360,7 @@ def admin_login(request):
         logger.error(f'Admin login error: {str(e)}')
         return Response({
             'success': False,
-            'message': 'Erreur serveur lors de l\'authentification'
+            'message': f"Erreur serveur: {str(e)}"
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
