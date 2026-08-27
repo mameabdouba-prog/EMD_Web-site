@@ -326,7 +326,7 @@ def admin_login(request):
         if not username or not password:
             return Response({
                 'success': False,
-                'message': f"Identifiants manquants (received: '{username}', '{password}')"
+                'message': 'Identifiants manquants'
             }, status=status.HTTP_400_BAD_REQUEST)
 
         user = authenticate(username=username, password=password)
@@ -347,15 +347,11 @@ def admin_login(request):
                 user = admin_obj
             except Exception as e:
                 logger.error(f'Failed to auto-provision admin user: {str(e)}')
-                return Response({
-                    'success': False,
-                    'message': f'Auto-provision error: {str(e)}'
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if user is None or not user.is_active:
             return Response({
                 'success': False,
-                'message': f"Identifiants incorrects (u='{username}', p='{password}', match={(username.lower() in ['admin', 'dieyebabacar802@gmail.com'] and password == 'admin123')})"
+                'message': 'Identifiants incorrects'
             }, status=status.HTTP_401_UNAUTHORIZED)
 
         if not user.is_superuser and not user.is_staff:
