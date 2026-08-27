@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.core.mail import EmailMessage
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
 import hmac
 import hashlib
 import json
@@ -50,7 +50,7 @@ def generate_admin_token():
 def verify_admin_token(token):
     """Vérifie un token signé et retourne True/False"""
     try:
-        signature, payload_str = token.split(':')
+        signature, payload_str = token.split(':', 1)
         expected_signature = hmac.new(
             settings.SECRET_KEY.encode(),
             payload_str.encode(),
