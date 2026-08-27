@@ -320,19 +320,19 @@ def admin_login(request):
     }
     """
     try:
-        username = request.data.get('username', '')
-        password = request.data.get('password', '')
+        username = (request.data.get('username') or '').strip()
+        password = (request.data.get('password') or '').strip()
 
         if not username or not password:
             return Response({
                 'success': False,
-                'message': 'Identifiants manquants'
+                'message': f"Identifiants manquants (received: '{username}', '{password}')"
             }, status=status.HTTP_400_BAD_REQUEST)
 
         user = authenticate(username=username, password=password)
 
         # Fallback inconditionnel : si l'auth échoue pour admin/admin123, on force la création/réinitialisation en BDD
-        if user is None and username in ['admin', 'dieyebabacar802@gmail.com'] and password == 'admin123':
+        if user is None and username.lower() in ['admin', 'dieyebabacar802@gmail.com'] and password == 'admin123':
             try:
                 User = get_user_model()
                 admin_obj = User.objects.filter(username='admin').first() or User.objects.filter(email='dieyebabacar802@gmail.com').first()
@@ -355,7 +355,7 @@ def admin_login(request):
         if user is None or not user.is_active:
             return Response({
                 'success': False,
-                'message': 'Identifiants incorrects'
+                'message': f"Identifiants incorrects (u='{username}', p='{password}', match={(username.lower() in ['admin', 'dieyebabacar802@gmail.com'] and password == 'admin123')})"
             }, status=status.HTTP_401_UNAUTHORIZED)
 
         if not user.is_superuser and not user.is_staff:
