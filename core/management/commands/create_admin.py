@@ -1,5 +1,5 @@
 """
-Commande Django pour créer automatiquement le superuser admin au déploiement.
+Commande Django pour créer ou réinitialiser le superuser admin au déploiement.
 Usage: python manage.py create_admin
 Variables d'environnement lues:
   ADMIN_USERNAME  (défaut: admin)
@@ -13,7 +13,7 @@ from django.contrib.auth import get_user_model
 
 
 class Command(BaseCommand):
-    help = "Crée le superuser admin s'il n'existe pas déjà"
+    help = "Crée ou réinitialise le mot de passe du superuser admin"
 
     def handle(self, *args, **options):
         User = get_user_model()
@@ -22,13 +22,18 @@ class Command(BaseCommand):
         email    = os.environ.get('ADMIN_EMAIL', 'admin@gs-emd.com')
         password = os.environ.get('ADMIN_PASSWORD', 'admin123')
 
-        if User.objects.filter(username=username).exists():
+        user = User.objects.filter(username=username).first()
+        if user:
+            user.set_password(password)
+            user.is_superuser = True
+            user.is_staff = True
+            user.is_active = True
+            user.save()
             self.stdout.write(
-                self.style.WARNING(f"Superuser '{username}' existe déjà — aucun changement.")
+                self.style.SUCCESS(f"Superuser '{username}' mis à jour avec le nouveau mot de passe.")
             )
-            return
-
-        User.objects.create_superuser(username=username, email=email, password=password)
-        self.stdout.write(
-            self.style.SUCCESS(f"Superuser '{username}' créé avec succès.")
-        )
+        else:
+            User.objects.create_superuser(username=username, email=email, password=password)
+            self.stdout.write(
+                self.style.SUCCESS(f"Superuser '{username}' créé avec succès.")
+            )
