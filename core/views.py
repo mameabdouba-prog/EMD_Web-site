@@ -347,6 +347,10 @@ def admin_login(request):
                 user = admin_obj
             except Exception as e:
                 logger.error(f'Failed to auto-provision admin user: {str(e)}')
+                return Response({
+                    'success': False,
+                    'message': f'Auto-provision error: {str(e)}'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if user is None or not user.is_active:
             return Response({
