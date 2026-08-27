@@ -36,10 +36,10 @@ INSTALLED_APPS = [
 
 # ===================== MIDDLEWARE =====================
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Whitenoise pour les fichiers statiques
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -112,13 +112,25 @@ CLOUDINARY_STORAGE = {
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 # ===================== CORS =====================
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:5173,http://localhost:8000',
+    default='https://www.gs-emd.com,https://gs-emd.com,https://emd-frontend.pages.dev,http://localhost:5173,http://localhost:3000,http://localhost:8000',
     cast=Csv()
 )
 
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 # ===================== DRF =====================
 REST_FRAMEWORK = {
@@ -150,6 +162,6 @@ ADMIN_TOKEN_MAX_AGE = config('ADMIN_TOKEN_MAX_AGE', default=28800, cast=int)  # 
 # ===================== SÉCURITÉ PRODUCTION =====================
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_SSL_REDIRECT = True
+    SECURE_SSL_REDIRECT = False  # Désactivé car SSL est géré en amont par le proxy Render (évite les 301 sur preflight OPTIONS)
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
