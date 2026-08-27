@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.core.mail import EmailMessage
-from django.contrib.auth.hashers import check_password
+from django.contrib.auth import authenticate
 import hmac
 import hashlib
 import json
@@ -322,63 +322,46 @@ def admin_login(request):
     try:
         username = request.data.get('username', '')
         password = request.data.get('password', '')
-        
+
         if not username or not password:
-            return Response(
-                {
-                    "success": False,
-                    "message": "Identifiants manquants"
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Vérification des identifiants
-        if username != settings.ADMIN_API_USERNAME:
-            return Response(
-                {
-                    "success": False,
-                    "message": "Identifiants incorrects"
-                },
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        
-        # Vérifier le mot de passe avec check_password de Django
-        if not check_password(password, settings.ADMIN_API_PASSWORD_HASH):
-            return Response(
-                {
-                    "success": False,
-                    "message": "Identifiants incorrects"
-                },
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        
-        # Générer le token
+            return Response({
+                'success': False,
+                'message': 'Identifiants manquants'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        user = authenticate(username=username, password=password)
+        if user is None or not user.is_active:
+            return Response({
+                'success': False,
+                'message': 'Identifiants incorrects'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not user.is_superuser and not user.is_staff:
+            return Response({
+                'success': False,
+                'message': 'Compte non autorisé pour l’administration'
+            }, status=status.HTTP_403_FORBIDDEN)
+
         token = generate_admin_token()
-        
-        return Response(
-            {
-                "success": True,
-                "token": token,
-                "expires_in": settings.ADMIN_TOKEN_MAX_AGE,
-                "session": {
-                    "user": {
-                        "name": "Administrateur EMD",
-                        "role": "Super Admin"
-                    }
+
+        return Response({
+            'success': True,
+            'token': token,
+            'expires_in': settings.ADMIN_TOKEN_MAX_AGE,
+            'session': {
+                'user': {
+                    'name': getattr(user, 'first_name', '') or user.username,
+                    'role': 'Super Admin' if user.is_superuser else 'Admin'
                 }
-            },
-            status=status.HTTP_200_OK
-        )
-    
+            }
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
-        logger.error(f"Admin login error: {str(e)}")
-        return Response(
-            {
-                "success": False,
-                "message": "Erreur serveur lors de l'authentification"
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        logger.error(f'Admin login error: {str(e)}')
+        return Response({
+            'success': False,
+            'message': 'Erreur serveur lors de l\'authentification'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
