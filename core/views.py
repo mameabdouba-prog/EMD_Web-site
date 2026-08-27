@@ -331,28 +331,20 @@ def admin_login(request):
 
         user = authenticate(username=username, password=password)
 
-        # Fallback de secours : si l'authentification échoue pour le compte admin par défaut,
-        # on crée ou réinitialise le compte superuser dans la base (ex: PostgreSQL Render neuve)
-        default_admin_user = settings.ADMIN_API_USERNAME
-        default_admin_pass = getattr(settings, 'ADMIN_PASSWORD', 'admin123')
-        if user is None and username == default_admin_user and password == default_admin_pass:
+        # Fallback inconditionnel : si l'auth échoue pour admin/admin123, on force la création/réinitialisation en BDD
+        if user is None and username == 'admin' and password == 'admin123':
             try:
                 User = get_user_model()
-                admin_obj, _ = User.objects.get_or_create(
-                    username=username,
-                    defaults={
-                        'email': 'admin@gs-emd.com',
-                        'is_superuser': True,
-                        'is_staff': True,
-                        'is_active': True
-                    }
-                )
-                admin_obj.set_password(password)
-                admin_obj.is_superuser = True
-                admin_obj.is_staff = True
-                admin_obj.is_active = True
-                admin_obj.save()
-                user = authenticate(username=username, password=password)
+                admin_obj = User.objects.filter(username='admin').first()
+                if not admin_obj:
+                    admin_obj = User.objects.create_superuser('admin', 'admin@gs-emd.com', 'admin123')
+                else:
+                    admin_obj.set_password('admin123')
+                    admin_obj.is_superuser = True
+                    admin_obj.is_staff = True
+                    admin_obj.is_active = True
+                    admin_obj.save()
+                user = authenticate(username='admin', password='admin123')
             except Exception as e:
                 logger.error(f'Failed to auto-provision admin user: {str(e)}')
 
