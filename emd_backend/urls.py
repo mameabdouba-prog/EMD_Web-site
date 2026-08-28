@@ -28,6 +28,16 @@ urlpatterns = [
     path('admin/messages/', views.admin_messages, name='root-admin-messages'),
     path('admin/messages/<int:pk>/', views.admin_message_detail, name='root-admin-message-detail'),
 
+    # Variantes "double préfixe" (admin/admin/...) : le bundle frontend actuellement
+    # déployé est compilé avec baseURL <host>/admin ET des chemins déjà préfixés
+    # /admin/... Ceux-ci tombaient dans Django admin (302 login / CSRF 403).
+    path('admin/admin/news/', views.admin_news, name='root-admin-admin-news'),
+    path('admin/admin/news/<int:pk>/', views.admin_news_detail, name='root-admin-admin-news-detail'),
+    path('admin/admin/gallery/', views.admin_gallery, name='root-admin-admin-gallery'),
+    path('admin/admin/gallery/<int:pk>/', views.admin_gallery_detail, name='root-admin-admin-gallery-detail'),
+    path('admin/admin/messages/', views.admin_messages, name='root-admin-admin-messages'),
+    path('admin/admin/messages/<int:pk>/', views.admin_message_detail, name='root-admin-admin-message-detail'),
+
     path('admin/', admin.site.urls),
     path('api/', include('core.urls')),
 ]
