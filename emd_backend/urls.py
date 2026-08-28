@@ -6,7 +6,17 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from core import views
+
 urlpatterns = [
+    # Routes d'accès direct pour la connexion admin API (évite le conflit avec Django admin)
+    path('admin/login/', views.admin_login, name='root-admin-login-slash'),
+    path('admin/login', views.admin_login, name='root-admin-login-noslash'),
+    path('admin/admin/login/', views.admin_login, name='root-admin-admin-login-slash'),
+    path('admin/admin/login', views.admin_login, name='root-admin-admin-login-noslash'),
+    path('api/admin/login/', views.admin_login, name='root-api-admin-login-slash'),
+    path('api/admin/login', views.admin_login, name='root-api-admin-login-noslash'),
+
     path('admin/', admin.site.urls),
     path('api/', include('core.urls')),
 ]

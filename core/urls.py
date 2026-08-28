@@ -23,6 +23,7 @@ urlpatterns = [
     
     # ==================== ADMIN ====================
     path('admin/login/', views.admin_login, name='admin-login'),
+    path('admin/login', views.admin_login, name='admin-login-noslash'),
     path('admin/news/', views.admin_news, name='admin-news'),
     path('admin/gallery/', views.admin_gallery, name='admin-gallery'),
     path('admin/messages/', views.admin_messages, name='admin-messages'),
