@@ -23,7 +23,8 @@ from .serializers import (
     ContactMessageSerializer,
     GalleryImageSerializer,
     NewsArticleListSerializer,
-    NewsArticleDetailSerializer
+    NewsArticleDetailSerializer,
+    NewsArticleAdminSerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -381,15 +382,15 @@ def admin_login(request):
             'message': 'Erreur serveur lors de l\'authentification'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def admin_news(request):
     """
-    Récupère toutes les actualités (admin version)
-    GET /api/admin/news/
+    Gestion admin des actualités (article d'annonce, événement, etc.)
+    GET  /api/admin/news/       -> liste de tous les articles
+    POST /api/admin/news/       -> création d'un article
     Nécessite un token Bearer valide
     """
-    # Vérifier le token
     token = extract_admin_token(request)
     if not token or not verify_admin_token(token):
         return Response(
@@ -399,16 +400,43 @@ def admin_news(request):
             },
             status=status.HTTP_401_UNAUTHORIZED
         )
-    
+
+    if request.method == 'POST':
+        serializer = NewsArticleAdminSerializer(
+            data=request.data,
+            context={"request": request}
+        )
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "success": False,
+                    "message": "Erreur de validation",
+                    "errors": serializer.errors
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        article = serializer.save()
+        return Response(
+            {
+                "success": True,
+                "message": "Article créé avec succès.",
+                "data": NewsArticleAdminSerializer(
+                    article,
+                    context={"request": request}
+                ).data
+            },
+            status=status.HTTP_201_CREATED
+        )
+
     # Retourner toutes les actualités (pas de filtre is_published pour l'admin)
-    articles = NewsArticle.objects.all().order_by('-date_created')
-    
-    serializer = NewsArticleListSerializer(
+    articles = NewsArticle.objects.all().order_by('-published_date')
+
+    serializer = NewsArticleAdminSerializer(
         articles,
         many=True,
         context={"request": request}
     )
-    
+
     return Response(
         {
             "success": True,
@@ -418,15 +446,16 @@ def admin_news(request):
         status=status.HTTP_200_OK
     )
 
-@api_view(['GET'])
+
+@api_view(['PATCH', 'DELETE'])
 @permission_classes([AllowAny])
-def admin_gallery(request):
+def admin_news_detail(request, pk):
     """
-    Récupère toutes les images de galerie (admin version)
-    GET /api/admin/gallery/
+    Détail d'un article (admin).
+    PATCH  /api/admin/news/<id>/ -> mise à jour (titre, contenu, statuts, image...)
+    DELETE /api/admin/news/<id>/ -> suppression
     Nécessite un token Bearer valide
     """
-    # Vérifier le token
     token = extract_admin_token(request)
     if not token or not verify_admin_token(token):
         return Response(
@@ -436,12 +465,104 @@ def admin_gallery(request):
             },
             status=status.HTTP_401_UNAUTHORIZED
         )
-    
+
+    article = get_object_or_404(NewsArticle, pk=pk)
+
+    if request.method == 'DELETE':
+        article.delete()
+        return Response(
+            {
+                "success": True,
+                "message": "Article supprimé avec succès."
+            },
+            status=status.HTTP_200_OK
+        )
+
+    serializer = NewsArticleAdminSerializer(
+        article,
+        data=request.data,
+        partial=True,
+        context={"request": request}
+    )
+    if not serializer.is_valid():
+        return Response(
+            {
+                "success": False,
+                "message": "Erreur de validation",
+                "errors": serializer.errors
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    serializer.save()
+    return Response(
+        {
+            "success": True,
+            "message": "Article mis à jour avec succès.",
+            "data": serializer.data
+        },
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def admin_gallery(request):
+    """
+    Gestion admin de la galerie photos.
+    GET  /api/admin/gallery/       -> liste de toutes les photos
+    POST /api/admin/gallery/       -> ajout d'une photo
+    Nécessite un token Bearer valide
+    """
+    token = extract_admin_token(request)
+    if not token or not verify_admin_token(token):
+        return Response(
+            {
+                "success": False,
+                "message": "Non autorisé"
+            },
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    if request.method == 'POST':
+        if not request.data.get('image'):
+            return Response(
+                {
+                    "success": False,
+                    "message": "Une photo est requise pour créer une entrée de galerie."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        serializer = GalleryImageSerializer(
+            data=request.data,
+            context={"request": request}
+        )
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "success": False,
+                    "message": "Erreur de validation",
+                    "errors": serializer.errors
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        image = serializer.save()
+        return Response(
+            {
+                "success": True,
+                "message": "Photo ajoutée à la galerie avec succès.",
+                "data": GalleryImageSerializer(
+                    image,
+                    context={"request": request}
+                ).data
+            },
+            status=status.HTTP_201_CREATED
+        )
+
     # Retourner toutes les images (pas de filtre is_active pour l'admin)
-    images = GalleryImage.objects.all().order_by('-date_created')
-    
-    serializer = GalleryImageSerializer(images, many=True)
-    
+    images = GalleryImage.objects.all().order_by('-date_uploaded')
+
+    serializer = GalleryImageSerializer(images, many=True, context={"request": request})
+
     return Response(
         {
             "success": True,
@@ -451,15 +572,16 @@ def admin_gallery(request):
         status=status.HTTP_200_OK
     )
 
-@api_view(['GET'])
+
+@api_view(['PATCH', 'DELETE'])
 @permission_classes([AllowAny])
-def admin_messages(request):
+def admin_gallery_detail(request, pk):
     """
-    Récupère tous les messages de contact (admin version)
-    GET /api/admin/messages/
+    Détail d'une photo de galerie (admin).
+    PATCH  /api/admin/gallery/<id>/ -> mise à jour
+    DELETE /api/admin/gallery/<id>/ -> suppression
     Nécessite un token Bearer valide
     """
-    # Vérifier le token
     token = extract_admin_token(request)
     if not token or not verify_admin_token(token):
         return Response(
@@ -469,17 +591,121 @@ def admin_messages(request):
             },
             status=status.HTTP_401_UNAUTHORIZED
         )
-    
-    # Retourner tous les messages
+
+    image = get_object_or_404(GalleryImage, pk=pk)
+
+    if request.method == 'DELETE':
+        image.delete()
+        return Response(
+            {
+                "success": True,
+                "message": "Photo supprimée avec succès."
+            },
+            status=status.HTTP_200_OK
+        )
+
+    serializer = GalleryImageSerializer(
+        image,
+        data=request.data,
+        partial=True,
+        context={"request": request}
+    )
+    if not serializer.is_valid():
+        return Response(
+            {
+                "success": False,
+                "message": "Erreur de validation",
+                "errors": serializer.errors
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    serializer.save()
+    return Response(
+        {
+            "success": True,
+            "message": "Photo mise à jour avec succès.",
+            "data": serializer.data
+        },
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def admin_messages(request):
+    """
+    Récupère tous les messages de contact (admin version)
+    GET /api/admin/messages/
+    Nécessite un token Bearer valide
+    """
+    token = extract_admin_token(request)
+    if not token or not verify_admin_token(token):
+        return Response(
+            {
+                "success": False,
+                "message": "Non autorisé"
+            },
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
     messages = ContactMessage.objects.all().order_by('-date')
-    
+
     serializer = ContactMessageSerializer(messages, many=True)
-    
+
     return Response(
         {
             "success": True,
             "count": messages.count(),
             "data": serializer.data
+        },
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(['PATCH', 'DELETE'])
+@permission_classes([AllowAny])
+def admin_message_detail(request, pk):
+    """
+    Détail d'un message de contact (admin).
+    PATCH  /api/admin/messages/<id>/ -> marquer lu/traité + notes
+    DELETE /api/admin/messages/<id>/ -> suppression
+    Nécessite un token Bearer valide
+    """
+    token = extract_admin_token(request)
+    if not token or not verify_admin_token(token):
+        return Response(
+            {
+                "success": False,
+                "message": "Non autorisé"
+            },
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    message = get_object_or_404(ContactMessage, pk=pk)
+
+    if request.method == 'DELETE':
+        message.delete()
+        return Response(
+            {
+                "success": True,
+                "message": "Message supprimé avec succès."
+            },
+            status=status.HTTP_200_OK
+        )
+
+    data = request.data or {}
+    if 'lu' in data:
+        message.lu = bool(data['lu'])
+    if 'traite' in data:
+        message.traite = bool(data['traite'])
+    if 'notes' in data:
+        message.notes = data['notes'] or ''
+    message.save()
+
+    return Response(
+        {
+            "success": True,
+            "message": "Message mis à jour avec succès."
         },
         status=status.HTTP_200_OK
     )

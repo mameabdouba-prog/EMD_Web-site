@@ -25,8 +25,11 @@ urlpatterns = [
     path('admin/login/', views.admin_login, name='admin-login'),
     path('admin/login', views.admin_login, name='admin-login-noslash'),
     path('admin/news/', views.admin_news, name='admin-news'),
+    path('admin/news/<int:pk>/', views.admin_news_detail, name='admin-news-detail'),
     path('admin/gallery/', views.admin_gallery, name='admin-gallery'),
+    path('admin/gallery/<int:pk>/', views.admin_gallery_detail, name='admin-gallery-detail'),
     path('admin/messages/', views.admin_messages, name='admin-messages'),
+    path('admin/messages/<int:pk>/', views.admin_message_detail, name='admin-message-detail'),
     
     # ==================== HEALTH CHECK ====================
     path('health/', views.health_check, name='health-check'),

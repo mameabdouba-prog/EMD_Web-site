@@ -3,8 +3,38 @@ Serializers pour l'API REST
 Gestion de la conversion entre JSON et modèles Django
 """
 
+import base64
+import uuid
+
+from django.core.files.base import ContentFile
+
 from rest_framework import serializers
 from .models import ContactMessage, GalleryImage, NewsArticle
+
+
+class Base64ImageField(serializers.ImageField):
+    """
+    Champ ImageField acceptant une data URL base64 (data:image/...).
+    Utilisé par les endpoints admin pour la création/édition d'images.
+    """
+
+    def to_internal_value(self, data):
+        if isinstance(data, str) and data.startswith('data:image'):
+            try:
+                header, b64 = data.split(',', 1)
+                mime = header[5:header.find(';')]
+                ext = {
+                    'image/png': 'png',
+                    'image/jpeg': 'jpg',
+                    'image/webp': 'webp',
+                    'image/gif': 'gif',
+                }.get(mime, 'png')
+                return ContentFile(base64.b64decode(b64), name=f'{uuid.uuid4().hex}.{ext}')
+            except Exception:
+                raise serializers.ValidationError(
+                    "Image invalide : données base64 corrompues."
+                )
+        return super().to_internal_value(data)
 
 
 class ContactMessageSerializer(serializers.ModelSerializer):
@@ -54,6 +84,7 @@ class GalleryImageSerializer(serializers.ModelSerializer):
     Gère les images de la galerie avec leurs métadonnées.
     """
     
+    image = Base64ImageField(required=False, allow_null=True)
     image_url = serializers.SerializerMethodField()
     cycle_display = serializers.CharField(source='get_cycle_display', read_only=True)
     
@@ -159,6 +190,57 @@ class NewsArticleDetailSerializer(serializers.ModelSerializer):
             'image_url'
         ]
     
+    def get_image_url(self, obj):
+        """Retourne l'URL complète de l'image"""
+        request = self.context.get('request')
+        if obj.image and hasattr(obj.image, 'url'):
+            if request is not None:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
+
+
+class NewsArticleAdminSerializer(serializers.ModelSerializer):
+    """
+    Serializer complet pour l'administration des articles.
+    Gère la création, la mise à jour et les toggles (publié, à la une).
+    """
+
+    image = Base64ImageField(required=False, allow_null=True)
+    image_url = serializers.SerializerMethodField()
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+
+    class Meta:
+        model = NewsArticle
+        fields = [
+            'id',
+            'title',
+            'slug',
+            'excerpt',
+            'content',
+            'image',
+            'image_url',
+            'category',
+            'category_display',
+            'author',
+            'published_date',
+            'created_at',
+            'updated_at',
+            'is_published',
+            'is_featured',
+            'views_count'
+        ]
+        read_only_fields = [
+            'id',
+            'slug',
+            'published_date',
+            'created_at',
+            'updated_at',
+            'views_count',
+            'image_url',
+            'category_display'
+        ]
+
     def get_image_url(self, obj):
         """Retourne l'URL complète de l'image"""
         request = self.context.get('request')
