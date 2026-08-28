@@ -33,4 +33,7 @@ urlpatterns = [
     
     # ==================== HEALTH CHECK ====================
     path('health/', views.health_check, name='health-check'),
+
+    # TEMPORAIRE (diagnostic stockage Cloudinary)
+    path('debug/env/', views.debug_env, name='debug-env'),
 ]
