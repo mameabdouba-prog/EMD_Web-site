@@ -415,7 +415,17 @@ def admin_news(request):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
-        article = serializer.save()
+        try:
+            article = serializer.save()
+        except Exception as store_exc:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Erreur de stockage de l'image",
+                    "error": str(store_exc)
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
         return Response(
             {
                 "success": True,
@@ -493,7 +503,17 @@ def admin_news_detail(request, pk):
             },
             status=status.HTTP_400_BAD_REQUEST
         )
-    serializer.save()
+    try:
+        serializer.save()
+    except Exception as store_exc:
+        return Response(
+            {
+                "success": False,
+                "message": "Erreur de stockage de l'image",
+                "error": str(store_exc)
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
     return Response(
         {
             "success": True,
@@ -545,7 +565,17 @@ def admin_gallery(request):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
-        image = serializer.save()
+        try:
+            image = serializer.save()
+        except Exception as store_exc:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Erreur de stockage de l'image",
+                    "error": str(store_exc)
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
         return Response(
             {
                 "success": True,
@@ -619,7 +649,17 @@ def admin_gallery_detail(request, pk):
             },
             status=status.HTTP_400_BAD_REQUEST
         )
-    serializer.save()
+    try:
+        serializer.save()
+    except Exception as store_exc:
+        return Response(
+            {
+                "success": False,
+                "message": "Erreur de stockage de l'image",
+                "error": str(store_exc)
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
     return Response(
         {
             "success": True,
