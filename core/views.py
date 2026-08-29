@@ -749,36 +749,3 @@ def admin_message_detail(request, pk):
         },
         status=status.HTTP_200_OK
     )
-
-
-@api_view(['GET'])
-def debug_env(request):
-    """TEMPORAIRE : état réel (masqué) de la config storage/Cloudinary du processus."""
-    import os as _os
-    from django.conf import settings as ds
-    from django.core.files.storage import default_storage
-
-    def mask(value, full=False):
-        if not value:
-            return ''
-        return value if full else f"{value[:3]}...(len={len(value)})"
-
-    def env_status(name):
-        value = _os.environ.get(name, '')
-        return {'set': bool(value), 'value': mask(value)}
-
-    wrapped = getattr(default_storage, '_wrapped', None)
-    wrapped_cls = f"{type(wrapped).__module__}.{type(wrapped).__name__}" if wrapped else None
-
-    return Response({
-        'DEFAULT_FILE_STORAGE': str(getattr(ds, 'DEFAULT_FILE_STORAGE', None)),
-        'STORAGES_default': str(ds.STORAGES.get('default', {}).get('BACKEND')),
-        'storage_class': wrapped_cls,
-        'CLOUDINARY_STORAGE_settings': {
-            k: (mask(v) if isinstance(v, str) else v) for k, v in ds.CLOUDINARY_STORAGE.items()
-        },
-        'CLOUDINARY_CLOUD_NAME_env': env_status('CLOUDINARY_CLOUD_NAME'),
-        'CLOUDINARY_API_KEY_env': env_status('CLOUDINARY_API_KEY'),
-        'CLOUDINARY_API_SECRET_env': env_status('CLOUDINARY_API_SECRET'),
-        'CLOUDINARY_URL_env': env_status('CLOUDINARY_URL'),
-    })
