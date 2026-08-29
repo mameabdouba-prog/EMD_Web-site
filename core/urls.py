@@ -27,6 +27,7 @@ urlpatterns = [
     path('admin/news/', views.admin_news, name='admin-news'),
     path('admin/news/<int:pk>/', views.admin_news_detail, name='admin-news-detail'),
     path('admin/gallery/', views.admin_gallery, name='admin-gallery'),
+    path('admin/gallery/batch/', views.admin_gallery_batch, name='admin-gallery-batch'),
     path('admin/gallery/<int:pk>/', views.admin_gallery_detail, name='admin-gallery-detail'),
     path('admin/messages/', views.admin_messages, name='admin-messages'),
     path('admin/messages/<int:pk>/', views.admin_message_detail, name='admin-message-detail'),

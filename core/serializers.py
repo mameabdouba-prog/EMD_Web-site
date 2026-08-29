@@ -9,7 +9,7 @@ import uuid
 from django.core.files.base import ContentFile
 
 from rest_framework import serializers
-from .models import ContactMessage, GalleryImage, NewsArticle
+from .models import ContactMessage, GalleryImage, NewsArticle, NewsImage
 
 
 class Base64ImageField(serializers.ImageField):
@@ -115,6 +115,26 @@ class GalleryImageSerializer(serializers.ModelSerializer):
         return None
 
 
+class NewsImageSerializer(serializers.ModelSerializer):
+    """
+    Serializer pour les images supplémentaires d'un article.
+    """
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = NewsImage
+        fields = ['id', 'image', 'image_url', 'caption', 'order']
+        read_only_fields = ['id', 'image_url']
+
+    def get_image_url(self, obj):
+        request = self.context.get('request')
+        if obj.image and hasattr(obj.image, 'url'):
+            if request is not None:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
+
+
 class NewsArticleListSerializer(serializers.ModelSerializer):
     """
     Serializer pour la liste des articles (version courte).
@@ -123,6 +143,7 @@ class NewsArticleListSerializer(serializers.ModelSerializer):
     
     image_url = serializers.SerializerMethodField()
     category_display = serializers.CharField(source='get_category_display', read_only=True)
+    additional_images = serializers.SerializerMethodField()
     
     class Meta:
         model = NewsArticle
@@ -133,6 +154,7 @@ class NewsArticleListSerializer(serializers.ModelSerializer):
             'excerpt',
             'image',
             'image_url',
+            'additional_images',
             'category',
             'category_display',
             'author',
@@ -140,7 +162,7 @@ class NewsArticleListSerializer(serializers.ModelSerializer):
             'is_featured',
             'views_count'
         ]
-        read_only_fields = ['id', 'slug', 'published_date', 'views_count', 'image_url']
+        read_only_fields = ['id', 'slug', 'published_date', 'views_count', 'image_url', 'additional_images']
     
     def get_image_url(self, obj):
         """Retourne l'URL complète de l'image"""
@@ -151,6 +173,11 @@ class NewsArticleListSerializer(serializers.ModelSerializer):
             return obj.image.url
         return None
 
+    def get_additional_images(self, obj):
+        request = self.context.get('request')
+        imgs = obj.additional_images.all()
+        return NewsImageSerializer(imgs, many=True, context={"request": request}).data
+
 
 class NewsArticleDetailSerializer(serializers.ModelSerializer):
     """
@@ -160,6 +187,7 @@ class NewsArticleDetailSerializer(serializers.ModelSerializer):
     
     image_url = serializers.SerializerMethodField()
     category_display = serializers.CharField(source='get_category_display', read_only=True)
+    additional_images = serializers.SerializerMethodField()
     
     class Meta:
         model = NewsArticle
@@ -171,6 +199,7 @@ class NewsArticleDetailSerializer(serializers.ModelSerializer):
             'content',
             'image',
             'image_url',
+            'additional_images',
             'category',
             'category_display',
             'author',
@@ -187,7 +216,8 @@ class NewsArticleDetailSerializer(serializers.ModelSerializer):
             'created_at', 
             'updated_at', 
             'views_count',
-            'image_url'
+            'image_url',
+            'additional_images'
         ]
     
     def get_image_url(self, obj):
@@ -199,16 +229,36 @@ class NewsArticleDetailSerializer(serializers.ModelSerializer):
             return obj.image.url
         return None
 
+    def get_additional_images(self, obj):
+        request = self.context.get('request')
+        imgs = obj.additional_images.all()
+        return NewsImageSerializer(imgs, many=True, context={"request": request}).data
+
 
 class NewsArticleAdminSerializer(serializers.ModelSerializer):
     """
     Serializer complet pour l'administration des articles.
     Gère la création, la mise à jour et les toggles (publié, à la une).
+    Accepte jusqu'à 4 images supplémentaires (base64) par article,
+    en plus de l'image principale (soit 5 images au total).
     """
 
     image = Base64ImageField(required=False, allow_null=True)
     image_url = serializers.SerializerMethodField()
     category_display = serializers.CharField(source='get_category_display', read_only=True)
+    additional_images = serializers.SerializerMethodField()
+    additional_images_data = serializers.ListField(
+        child=Base64ImageField(),
+        required=False,
+        write_only=True,
+        allow_empty=True
+    )
+    remove_additional_images = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        write_only=True,
+        allow_empty=True
+    )
 
     class Meta:
         model = NewsArticle
@@ -220,6 +270,9 @@ class NewsArticleAdminSerializer(serializers.ModelSerializer):
             'content',
             'image',
             'image_url',
+            'additional_images',
+            'additional_images_data',
+            'remove_additional_images',
             'category',
             'category_display',
             'author',
@@ -238,6 +291,7 @@ class NewsArticleAdminSerializer(serializers.ModelSerializer):
             'updated_at',
             'views_count',
             'image_url',
+            'additional_images',
             'category_display'
         ]
 
@@ -249,3 +303,42 @@ class NewsArticleAdminSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.image.url)
             return obj.image.url
         return None
+
+    def get_additional_images(self, obj):
+        request = self.context.get('request')
+        imgs = obj.additional_images.all()
+        return NewsImageSerializer(imgs, many=True, context={"request": request}).data
+
+    def validate(self, attrs):
+        data = attrs.get('additional_images_data') or []
+        if len(data) > 4:
+            raise serializers.ValidationError(
+                {"additional_images_data": "Maximum 4 images supplémentaires par article (5 au total avec l'image principale)."}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        additional = validated_data.pop('additional_images_data', [])
+        remove_ids = validated_data.pop('remove_additional_images', [])
+        article = super().create(validated_data)
+        self._save_additional_images(article, additional)
+        return article
+
+    def update(self, instance, validated_data):
+        additional = validated_data.pop('additional_images_data', [])
+        remove_ids = validated_data.pop('remove_additional_images', [])
+        instance = super().update(instance, validated_data)
+        if remove_ids:
+            instance.additional_images.filter(id__in=remove_ids).delete()
+        self._save_additional_images(instance, additional)
+        return instance
+
+    def _save_additional_images(self, article, additional):
+        existing_total = article.additional_images.count()
+        remaining_slots = 4 - existing_total
+        for i, img in enumerate(additional[:max(remaining_slots, 0)]):
+            NewsImage.objects.create(
+                article=article,
+                image=img,
+                order=existing_total + i
+            )

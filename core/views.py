@@ -18,13 +18,14 @@ import secrets
 from datetime import datetime, timedelta
 import logging
 
-from .models import ContactMessage, GalleryImage, NewsArticle
+from .models import ContactMessage, GalleryImage, NewsArticle, NewsImage
 from .serializers import (
     ContactMessageSerializer,
     GalleryImageSerializer,
     NewsArticleListSerializer,
     NewsArticleDetailSerializer,
-    NewsArticleAdminSerializer
+    NewsArticleAdminSerializer,
+    NewsImageSerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -667,6 +668,95 @@ def admin_gallery_detail(request, pk):
             "data": serializer.data
         },
         status=status.HTTP_200_OK
+    )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def admin_gallery_batch(request):
+    """
+    Ajout groupé de photos à la galerie (jusqu'à 5 images par soumission).
+    POST /api/admin/gallery/batch/
+    {
+        "title": "Titre commun (optionnel)",
+        "description": "Description commune (optionnel)",
+        "cycle": "general",
+        "images": ["data:image/...", "data:image/..."]
+    }
+    Nécessite un token Bearer valide
+    """
+    token = extract_admin_token(request)
+    if not token or not verify_admin_token(token):
+        return Response(
+            {"success": False, "message": "Non autorisé"},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    MAX_BATCH = 5
+    images_data = request.data.get('images') or []
+    if not isinstance(images_data, list) or len(images_data) == 0:
+        return Response(
+            {"success": False, "message": "Au moins une photo est requise."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if len(images_data) > MAX_BATCH:
+        return Response(
+            {
+                "success": False,
+                "message": f"Maximum {MAX_BATCH} images par ajout."
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    common = {
+        "title": (request.data.get('title') or '').strip() or "Photo de l'EMD",
+        "description": (request.data.get('description') or '').strip(),
+        "cycle": request.data.get('cycle') or 'general',
+        "is_active": True,
+        "is_featured": False,
+    }
+
+    created = []
+    base_order = GalleryImage.objects.count()
+    for idx, b64 in enumerate(images_data):
+        payload = dict(common)
+        payload['image'] = b64
+        serializer = GalleryImageSerializer(
+            data=payload,
+            context={"request": request}
+        )
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "success": False,
+                    "message": "Erreur de validation d'une photo.",
+                    "errors": serializer.errors,
+                    "index": idx,
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            image = serializer.save(order=base_order + idx)
+        except Exception as store_exc:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Erreur de stockage d'une image.",
+                    "error": str(store_exc),
+                    "index": idx,
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        created.append(GalleryImageSerializer(image, context={"request": request}).data)
+
+    return Response(
+        {
+            "success": True,
+            "message": f"{len(created)} photo(s) ajoutée(s) à la galerie avec succès.",
+            "count": len(created),
+            "data": created,
+        },
+        status=status.HTTP_201_CREATED
     )
 
 

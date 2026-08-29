@@ -147,6 +147,47 @@ class GalleryImage(models.Model):
         return f"{self.title} ({self.get_cycle_display()})"
 
 
+class NewsImage(models.Model):
+    """
+    Image supplémentaire liée à un article d'actualité.
+    Chaque article peut contenir jusqu'à 5 images (1 principale + 4 supplémentaires).
+    """
+
+    article = models.ForeignKey(
+        'NewsArticle',
+        on_delete=models.CASCADE,
+        related_name='additional_images',
+        verbose_name="Article"
+    )
+
+    image = models.ImageField(
+        upload_to='news/%Y/%m/',
+        verbose_name="Image",
+        help_text="Image supplémentaire de l'article"
+    )
+
+    caption = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Légende",
+        help_text="Légende facultative de l'image"
+    )
+
+    order = models.IntegerField(
+        default=0,
+        verbose_name="Ordre d'affichage",
+        help_text="Ordre d'affichage (plus petit = en premier)"
+    )
+
+    class Meta:
+        verbose_name = "Image d'article"
+        verbose_name_plural = "Images d'articles"
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f"Image de « {self.article.title} »"
+
+
 class NewsArticle(models.Model):
     """
     Modèle pour stocker les articles d'actualités de l'école

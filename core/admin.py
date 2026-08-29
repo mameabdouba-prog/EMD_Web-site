@@ -5,7 +5,7 @@ pour l'application EMD
 
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import ContactMessage, GalleryImage, NewsArticle
+from .models import ContactMessage, GalleryImage, NewsArticle, NewsImage
 
 # ==================== CONTACT MESSAGE ====================
 
@@ -136,9 +136,19 @@ class GalleryImageAdmin(admin.ModelAdmin):
 
 
 # ==================== NEWS ARTICLE ====================
+class NewsImageInline(admin.TabularInline):
+    """Images supplémentaires d'un article."""
+    model = NewsImage
+    extra = 0
+    fields = ['image', 'caption', 'order']
+    readonly_fields = []
+
+
 @admin.register(NewsArticle)
 class NewsArticleAdmin(admin.ModelAdmin):
     """Administration pour NewsArticle"""
+
+    inlines = [NewsImageInline]
 
     list_display = [
         'id', 'image_preview', 'title', 'category',
