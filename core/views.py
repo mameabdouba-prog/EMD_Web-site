@@ -771,7 +771,8 @@ def debug_env(request):
     wrapped_cls = f"{type(wrapped).__module__}.{type(wrapped).__name__}" if wrapped else None
 
     return Response({
-        'DEFAULT_FILE_STORAGE': ds.DEFAULT_FILE_STORAGE,
+        'DEFAULT_FILE_STORAGE': str(getattr(ds, 'DEFAULT_FILE_STORAGE', None)),
+        'STORAGES_default': str(ds.STORAGES.get('default', {}).get('BACKEND')),
         'storage_class': wrapped_cls,
         'CLOUDINARY_STORAGE_settings': {
             k: (mask(v) if isinstance(v, str) else v) for k, v in ds.CLOUDINARY_STORAGE.items()
