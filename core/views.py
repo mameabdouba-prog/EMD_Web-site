@@ -726,6 +726,17 @@ def admin_gallery(request):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        # Notification push aux abonnés lors de l'ajout d'une photo
+        try:
+            send_to_subscriptions(
+                title="Nouvelle photo – Galerie EMD",
+                body=image.title or "Une nouvelle photo a été ajoutée à la galerie.",
+                url="/galerie/",
+            )
+        except Exception as push_exc:
+            logger.error(f"Erreur envoi push nouvelle photo galerie : {str(push_exc)}")
+
         return Response(
             {
                 "success": True,
