@@ -32,6 +32,11 @@ urlpatterns = [
     path('admin/messages/', views.admin_messages, name='admin-messages'),
     path('admin/messages/<int:pk>/', views.admin_message_detail, name='admin-message-detail'),
     
+    # ==================== WEB PUSH ====================
+    path('push/subscribe/', views.push_subscribe, name='push-subscribe'),
+    path('push/unsubscribe/', views.push_unsubscribe, name='push-unsubscribe'),
+    path('admin/push/test/', views.push_test, name='push-test'),
+    
     # ==================== HEALTH CHECK ====================
     path('health/', views.health_check, name='health-check'),
 ]

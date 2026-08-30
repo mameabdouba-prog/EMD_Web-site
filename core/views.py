@@ -18,7 +18,13 @@ import secrets
 from datetime import datetime, timedelta
 import logging
 
-from .models import ContactMessage, GalleryImage, NewsArticle, NewsImage
+from .models import (
+    ContactMessage,
+    GalleryImage,
+    NewsArticle,
+    NewsImage,
+    PushSubscription,
+)
 from .serializers import (
     ContactMessageSerializer,
     GalleryImageSerializer,
@@ -27,6 +33,7 @@ from .serializers import (
     NewsArticleAdminSerializer,
     NewsImageSerializer
 )
+from .push import send_to_subscriptions
 
 logger = logging.getLogger(__name__)
 
@@ -292,6 +299,132 @@ def news_detail(request, slug):
         status=status.HTTP_200_OK
     )
 
+# ==================== WEB PUSH ====================
+
+def _parse_push_body(request):
+    """Extrait un body JSON quelle que soit l'en-tête Content-Type."""
+    if request.method == 'GET':
+        return {}
+    try:
+        body = getattr(request, 'body', None)
+        if body:
+            return json.loads(body)
+    except (TypeError, ValueError):
+        pass
+    try:
+        return request.data
+    except Exception:
+        return {}
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def push_subscribe(request):
+    """
+    Enregistre un abonnement Web Push renvoyé par le navigateur.
+    Body JSON attendu : { "endpoint", "keys": { "p256dh", "auth" }, "user_agent" }
+    """
+    data = _parse_push_body(request)
+
+    endpoint = (data.get('endpoint') or '').strip()
+    keys = data.get('keys') or {}
+    p256dh = (keys.get('p256dh') or '').strip()
+    auth = (keys.get('auth') or '').strip()
+
+    if not endpoint or not p256dh or not auth:
+        return Response(
+            {
+                "success": False,
+                "message": "Paramètres d'abonnement incomplets."
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    user_agent = (data.get('user_agent') or request.META.get('HTTP_USER_AGENT') or '')[:255]
+
+    PushSubscription.objects.update_or_create(
+        endpoint=endpoint,
+        defaults={
+            'p256dh': p256dh,
+            'auth': auth,
+            'user_agent': user_agent,
+            'last_error': '',
+        }
+    )
+
+    return Response(
+        {
+            "success": True,
+            "message": "Abonnement aux notifications enregistré."
+        },
+        status=status.HTTP_201_CREATED
+    )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def push_unsubscribe(request):
+    """
+    Supprime un abonnement Web Push existant.
+    Body JSON attendu : { "endpoint" }
+    """
+    data = _parse_push_body(request)
+    endpoint = (data.get('endpoint') or '').strip()
+
+    if not endpoint:
+        return Response(
+            {
+                "success": False,
+                "message": "Endpoint manquant."
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    deleted, _ = PushSubscription.objects.filter(endpoint=endpoint).delete()
+
+    return Response(
+        {
+            "success": True,
+            "deleted": deleted,
+            "message": "Abonnement supprimé."
+        },
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def push_test(request):
+    """
+    Endpoint admin (protected) pour tester l'envoi d'une notification à tous les abonnés.
+    Body JSON attendu : { "title", "body", "url" }
+    """
+    token = extract_admin_token(request)
+    if not token or not verify_admin_token(token):
+        return Response(
+            {
+                "success": False,
+                "message": "Non autorisé"
+            },
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    data = _parse_push_body(request)
+    title = (data.get('title') or '').strip() or "Notification EMD"
+    body = (data.get('body') or '').strip() or "Nouvelle actualité disponible."
+    url = (data.get('url') or '') or None
+
+    count = send_to_subscriptions(title=title, body=body, url=url)
+
+    return Response(
+        {
+            "success": True,
+            "sent": count,
+            "message": f"Notification envoyée à {count} abonné(s)."
+        },
+        status=status.HTTP_200_OK
+    )
+
 # ==================== HEALTH CHECK ====================
 
 @api_view(['GET'])
@@ -424,6 +557,18 @@ def admin_news(request):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        # Notification push aux abonnés quand un article est publié
+        if article.is_published:
+            try:
+                send_to_subscriptions(
+                    title="Nouvelle actualité EMD",
+                    body=article.excerpt or article.title,
+                    url=f"/actualites/{article.slug}/",
+                )
+            except Exception as push_exc:
+                logger.error(f"Erreur envoi push nouvelle actualité : {str(push_exc)}")
+
         return Response(
             {
                 "success": True,

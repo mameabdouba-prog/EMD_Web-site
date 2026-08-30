@@ -351,6 +351,26 @@ EMAIL_FAIL_SILENTLY = False
 
 
 # ============================================================
+# WEB PUSH NOTIFICATIONS (VAPID)
+# ============================================================
+
+VAPID_PUBLIC_KEY = config(
+    "VAPID_PUBLIC_KEY",
+    default=""
+)
+
+VAPID_PRIVATE_KEY = config(
+    "VAPID_PRIVATE_KEY",
+    default=""
+)
+
+VAPID_ADMIN_EMAIL = config(
+    "VAPID_ADMIN_EMAIL",
+    default="contact@gs-emd.com"
+)
+
+
+# ============================================================
 # ADMIN API AUTHENTICATION
 # ============================================================
 

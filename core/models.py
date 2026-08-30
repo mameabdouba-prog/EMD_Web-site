@@ -313,3 +313,58 @@ class NewsArticle(models.Model):
         """Incrémente le compteur de vues"""
         self.views_count += 1
         self.save(update_fields=['views_count'])
+
+
+class PushSubscription(models.Model):
+    """
+    Abonnement Web Push d'un navigateur/utilisateur pour recevoir des
+    notifications (ex : publication d'une nouvelle actualité).
+    """
+
+    endpoint = models.URLField(
+        max_length=500,
+        unique=True,
+        verbose_name="Endpoint",
+        help_text="URL d'abonnement renvoyée par le service push du navigateur"
+    )
+
+    p256dh = models.CharField(
+        max_length=255,
+        verbose_name="Clé p256dh",
+        help_text="Clé publique de chiffrement renvoyée par le navigateur"
+    )
+
+    auth = models.CharField(
+        max_length=255,
+        verbose_name="Clé auth",
+        help_text="Secret d'authentification renvoyé par le navigateur"
+    )
+
+    user_agent = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name="Navigateur",
+        help_text="User-Agent du navigateur au moment de l'abonnement"
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Date d'abonnement"
+    )
+
+    last_error = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name="Dernière erreur",
+        help_text="Dernière erreur d'envoi (utile pour repérer les abonnements expirés)"
+    )
+
+    class Meta:
+        verbose_name = "Abonnement push"
+        verbose_name_plural = "Abonnements push"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"PushSubscription ({self.created_at.strftime('%d/%m/%Y %H:%M')})"
