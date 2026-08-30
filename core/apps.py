@@ -9,7 +9,13 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         import core.signals
-        self.ensure_superuser()
+        # Provisionnement du superuser DÉSACTIVÉ par défaut.
+        # Effectuer une requête DB à chaque démarrage de worker ralentit le boot
+        # et réinitialise le mot de passe admin. Créer le superuser une seule fois
+        # via `python manage.py create_admin` au déploiement, ou activer
+        # explicitement le provisioning ici avec EMD_AUTO_SUPERUSER=1.
+        if os.environ.get('EMD_AUTO_SUPERUSER') == '1':
+            self.ensure_superuser()
 
     def ensure_superuser(self):
         try:

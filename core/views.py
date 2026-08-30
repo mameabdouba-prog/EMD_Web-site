@@ -17,6 +17,7 @@ import json
 import secrets
 from datetime import datetime, timedelta
 import logging
+import threading
 
 from .models import ContactMessage, GalleryImage, NewsArticle, NewsImage
 from .serializers import (
@@ -71,6 +72,19 @@ def extract_admin_token(request):
 
 # ==================== CONTACT ====================
 
+def _send_email_in_background(email):
+    """Envoie l'email dans un thread d'arrière-plan pour ne pas bloquer
+    la requête HTTP (la connexion SMTP peut prendre plusieurs secondes)."""
+    try:
+        email.send(fail_silently=False)
+        logger.info("Email envoyé avec succès")
+    except Exception as e:
+        logger.error(f"Erreur envoi email : {str(e)}")
+    finally:
+        from django.db import connection
+        connection.close()
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def create_contact_message(request):
@@ -110,9 +124,13 @@ def create_contact_message(request):
             reply_to=[message_instance.email],
         )
 
-        email.send(fail_silently=False)
-
-        logger.info("Email envoyé avec succès")
+        # Envoi en arrière-plan pour ne pas bloquer la réponse HTTP
+        thread = threading.Thread(
+            target=_send_email_in_background,
+            args=(email,),
+            daemon=True
+        )
+        thread.start()
 
     except Exception as e:
         logger.error(f"Erreur envoi email : {str(e)}")
@@ -174,7 +192,7 @@ def get_contact_messages(request):
     return Response(
         {
             "success": True,
-            "count": messages.count(),
+            "count": len(serializer.data),
             "data": serializer.data
         },
         status=status.HTTP_200_OK
@@ -204,17 +222,11 @@ def gallery_list(request):
         context={"request": request}
     )
 
-    # Ajouter l'URL complète de chaque image
-    data = []
-    for item in serializer.data:
-        item['image_url'] = request.build_absolute_uri(item['image'])
-        data.append(item)
-
     return Response(
         {
             "success": True,
-            "count": images.count(),
-            "data": data
+            "count": len(serializer.data),
+            "data": serializer.data
         },
         status=status.HTTP_200_OK
     )
@@ -243,7 +255,10 @@ def gallery_detail(request, pk):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def news_list(request):
-    articles = NewsArticle.objects.filter(is_published=True)
+    articles = (
+        NewsArticle.objects.filter(is_published=True)
+        .prefetch_related('additional_images')
+    )
 
     category = request.query_params.get('category')
     if category:
@@ -266,7 +281,7 @@ def news_list(request):
     return Response(
         {
             "success": True,
-            "count": articles.count(),
+            "count": len(serializer.data),
             "data": serializer.data
         },
         status=status.HTTP_200_OK
@@ -276,7 +291,7 @@ def news_list(request):
 @permission_classes([AllowAny])
 def news_detail(request, slug):
     article = get_object_or_404(
-        NewsArticle,
+        NewsArticle.objects.prefetch_related('additional_images'),
         slug=slug,
         is_published=True
     )
@@ -440,7 +455,11 @@ def admin_news(request):
         )
 
     # Retourner toutes les actualités (pas de filtre is_published pour l'admin)
-    articles = NewsArticle.objects.all().order_by('-published_date')
+    articles = (
+        NewsArticle.objects.all()
+        .order_by('-published_date')
+        .prefetch_related('additional_images')
+    )
 
     serializer = NewsArticleAdminSerializer(
         articles,
@@ -451,7 +470,7 @@ def admin_news(request):
     return Response(
         {
             "success": True,
-            "count": articles.count(),
+            "count": len(serializer.data),
             "data": serializer.data
         },
         status=status.HTTP_200_OK
@@ -477,7 +496,10 @@ def admin_news_detail(request, pk):
             status=status.HTTP_401_UNAUTHORIZED
         )
 
-    article = get_object_or_404(NewsArticle, pk=pk)
+    article = get_object_or_404(
+        NewsArticle.objects.prefetch_related('additional_images'),
+        pk=pk
+    )
 
     if request.method == 'DELETE':
         article.delete()
@@ -597,7 +619,7 @@ def admin_gallery(request):
     return Response(
         {
             "success": True,
-            "count": images.count(),
+            "count": len(serializer.data),
             "data": serializer.data
         },
         status=status.HTTP_200_OK
@@ -785,7 +807,7 @@ def admin_messages(request):
     return Response(
         {
             "success": True,
-            "count": messages.count(),
+            "count": len(serializer.data),
             "data": serializer.data
         },
         status=status.HTTP_200_OK
