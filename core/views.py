@@ -17,7 +17,6 @@ import json
 import secrets
 from datetime import datetime, timedelta
 import logging
-import threading
 
 from .models import ContactMessage, GalleryImage, NewsArticle, NewsImage
 from .serializers import (
@@ -72,19 +71,6 @@ def extract_admin_token(request):
 
 # ==================== CONTACT ====================
 
-def _send_email_in_background(email):
-    """Envoie l'email dans un thread d'arrière-plan pour ne pas bloquer
-    la requête HTTP (la connexion SMTP peut prendre plusieurs secondes)."""
-    try:
-        email.send(fail_silently=False)
-        logger.info("Email envoyé avec succès")
-    except Exception as e:
-        logger.error(f"Erreur envoi email : {str(e)}")
-    finally:
-        from django.db import connection
-        connection.close()
-
-
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def create_contact_message(request):
@@ -124,13 +110,9 @@ def create_contact_message(request):
             reply_to=[message_instance.email],
         )
 
-        # Envoi en arrière-plan pour ne pas bloquer la réponse HTTP
-        thread = threading.Thread(
-            target=_send_email_in_background,
-            args=(email,),
-            daemon=True
-        )
-        thread.start()
+        email.send(fail_silently=False)
+
+        logger.info("Email envoyé avec succès")
 
     except Exception as e:
         logger.error(f"Erreur envoi email : {str(e)}")
