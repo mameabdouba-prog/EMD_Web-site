@@ -7,9 +7,6 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
-from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.core.mail import EmailMessage
@@ -320,8 +317,9 @@ def _parse_push_body(request):
         return {}
 
 
-@csrf_exempt
-@require_POST
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def push_subscribe(request):
     """
     Enregistre un abonnement Web Push renvoyé par le navigateur.
@@ -335,12 +333,12 @@ def push_subscribe(request):
     auth = (keys.get('auth') or '').strip()
 
     if not endpoint or not p256dh or not auth:
-        return JsonResponse(
+        return Response(
             {
                 "success": False,
                 "message": "Paramètres d'abonnement incomplets."
             },
-            status=400
+            status=status.HTTP_400_BAD_REQUEST
         )
 
     user_agent = (data.get('user_agent') or request.META.get('HTTP_USER_AGENT') or '')[:255]
@@ -355,17 +353,18 @@ def push_subscribe(request):
         }
     )
 
-    return JsonResponse(
+    return Response(
         {
             "success": True,
             "message": "Abonnement aux notifications enregistré."
         },
-        status=201
+        status=status.HTTP_201_CREATED
     )
 
 
-@csrf_exempt
-@require_POST
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def push_unsubscribe(request):
     """
     Supprime un abonnement Web Push existant.
@@ -375,28 +374,28 @@ def push_unsubscribe(request):
     endpoint = (data.get('endpoint') or '').strip()
 
     if not endpoint:
-        return JsonResponse(
+        return Response(
             {
                 "success": False,
                 "message": "Endpoint manquant."
             },
-            status=400
+            status=status.HTTP_400_BAD_REQUEST
         )
 
     deleted, _ = PushSubscription.objects.filter(endpoint=endpoint).delete()
 
-    return JsonResponse(
+    return Response(
         {
             "success": True,
             "deleted": deleted,
             "message": "Abonnement supprimé."
         },
-        status=200
+        status=status.HTTP_200_OK
     )
 
 
-@csrf_exempt
-@require_POST
+@api_view(['POST'])
+@permission_classes([AllowAny])
 def push_test(request):
     """
     Endpoint admin pour tester l'envoi d'une notification à tous les abonnés.
@@ -404,12 +403,12 @@ def push_test(request):
     """
     token = extract_admin_token(request)
     if not token or not verify_admin_token(token):
-        return JsonResponse(
+        return Response(
             {
                 "success": False,
                 "message": "Non autorisé"
             },
-            status=401
+            status=status.HTTP_401_UNAUTHORIZED
         )
 
     data = _parse_push_body(request)
@@ -419,13 +418,13 @@ def push_test(request):
 
     count = send_to_subscriptions(title=title, body=body, url=url)
 
-    return JsonResponse(
+    return Response(
         {
             "success": True,
             "sent": count,
             "message": f"Notification envoyée à {count} abonné(s)."
         },
-        status=200
+        status=status.HTTP_200_OK
     )
 
 # ==================== HEALTH CHECK ====================

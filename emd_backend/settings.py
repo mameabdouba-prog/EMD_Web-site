@@ -235,11 +235,41 @@ STORAGES = {
 
 
 # ============================================================
+# PROXY & HEADERS (Render / Cloudflare)
+# ============================================================
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+
+
+# ============================================================
 # CORS
 # ============================================================
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = config("CORS_ALLOW_ALL_ORIGINS", default=True, cast=bool)
 CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "https://gs-emd.com",
+    "https://www.gs-emd.com",
+    "https://gs-end.com",
+    "https://www.gs-end.com",
+    "https://emd-site.pages.dev",
+    "https://emd-frontend.pages.dev",
+    "https://gs-emd.onrender.com",
+]
+
+if DEBUG:
+    CORS_ALLOWED_ORIGINS += [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8000",
+    ]
+
+extra_cors = config("CORS_ALLOWED_ORIGINS_EXTRA", default="", cast=Csv())
+for item in extra_cors:
+    if item and item not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(item)
 
 CORS_ALLOW_HEADERS = [
     "accept",
@@ -261,7 +291,12 @@ CORS_ALLOW_HEADERS = [
 CSRF_TRUSTED_ORIGINS = [
     "https://gs-emd.com",
     "https://www.gs-emd.com",
+    "https://gs-end.com",
+    "https://www.gs-end.com",
     "https://*.pages.dev",
+    "https://emd-site.pages.dev",
+    "https://emd-frontend.pages.dev",
+    "https://gs-emd.onrender.com",
 ]
 
 if DEBUG:
@@ -270,6 +305,11 @@ if DEBUG:
         "http://localhost:3000",
         "http://localhost:8000",
     ]
+
+extra_csrf = config("CSRF_TRUSTED_ORIGINS_EXTRA", default="", cast=Csv())
+for item in extra_csrf:
+    if item and item not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(item)
 
 
 # ============================================================
@@ -390,14 +430,8 @@ ADMIN_TOKEN_MAX_AGE = config(
 # ============================================================
 
 if not DEBUG:
-
-    SECURE_PROXY_SSL_HEADER = (
-        "HTTP_X_FORWARDED_PROTO",
-        "https"
-    )
-
     SECURE_SSL_REDIRECT = False
-
     SESSION_COOKIE_SECURE = True
-
     CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SAMESITE = "Lax"
