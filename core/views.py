@@ -4,9 +4,10 @@ Gestion des endpoints REST
 """
 
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.core.mail import EmailMessage
@@ -317,7 +318,9 @@ def _parse_push_body(request):
         return {}
 
 
+@csrf_exempt
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([AllowAny])
 def push_subscribe(request):
     """
@@ -361,7 +364,9 @@ def push_subscribe(request):
     )
 
 
+@csrf_exempt
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([AllowAny])
 def push_unsubscribe(request):
     """

@@ -238,19 +238,7 @@ STORAGES = {
 # CORS
 # ============================================================
 
-CORS_ALLOWED_ORIGINS = [
-    "https://gs-emd.com",
-    "https://www.gs-emd.com",
-]
-
-# Développement local
-if DEBUG:
-    CORS_ALLOWED_ORIGINS += [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://localhost:8000",
-    ]
-
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_HEADERS = [
@@ -273,6 +261,7 @@ CORS_ALLOW_HEADERS = [
 CSRF_TRUSTED_ORIGINS = [
     "https://gs-emd.com",
     "https://www.gs-emd.com",
+    "https://*.pages.dev",
 ]
 
 if DEBUG:
